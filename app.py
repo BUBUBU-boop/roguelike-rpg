@@ -672,6 +672,30 @@ def load_game():
 
 
 # =====================
+# RESET
+# =====================
+
+@app.route("/reset")
+def reset():
+
+    global player
+    global dungeon
+    global current_enemy
+
+    player = Player()
+
+    dungeon = Dungeon()
+
+    current_enemy = None
+
+    return jsonify(
+        {
+            "status":"reset"
+        }
+    )
+
+
+# =====================
 # RUN
 # =====================
 
