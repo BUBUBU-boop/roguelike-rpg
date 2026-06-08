@@ -25,6 +25,11 @@ button{
     font-size:16px;
 }
 
+input{
+    padding:8px;
+    margin:5px;
+}
+
 #status{
     border:1px solid #555;
     padding:10px;
@@ -41,6 +46,12 @@ button{
     border:1px solid #555;
     padding:10px;
     min-height:60px;
+}
+
+#deathArea{
+    border:2px solid red;
+    padding:10px;
+    margin-top:10px;
 }
 
 </style>
@@ -61,6 +72,41 @@ button{
 
 <div id="message">
 ゲーム開始
+</div>
+
+<div
+id="deathArea"
+style="display:none;">
+
+<h2>死亡しました</h2>
+
+<p>
+名前を入力して死亡記録を残せます
+</p>
+
+<input
+type="text"
+id="playerName"
+maxlength="20">
+
+<button
+id="saveDeathButton"
+onclick="saveDeathRecord()">
+
+死亡記録を残す
+
+</button>
+
+</div>
+
+<div id="records">
+
+<h3>死亡ランキング</h3>
+
+<div id="recordList">
+読み込み中...
+</div>
+
 </div>
 
 <br>
@@ -103,30 +149,7 @@ button{
 最初から
 </button>
 
-
 <script>
-
-async function loadPlayer(){
-
-    const response =
-        await fetch("/player");
-
-    const data =
-        await response.json();
-
-    document.getElementById(
-        "status"
-    ).innerHTML =
-
-`
-Lv : ${data.level}<br>
-HP : ${data.hp}/${data.max_hp}<br>
-攻撃 : ${data.attack}<br>
-EXP : ${data.exp}<br>
-Floor : ${data.floor}
-`;
-
-}
 
 async function loadEnemy(){
 
@@ -140,23 +163,142 @@ async function loadEnemy(){
         data.enemy === null
     ){
 
-        document.getElementById(
+        document
+        .getElementById(
             "enemy"
-        ).innerHTML =
+        )
+        .innerHTML =
         "敵なし";
 
         return;
-
     }
 
-    document.getElementById(
+    document
+    .getElementById(
         "enemy"
-    ).innerHTML =
+    )
+    .innerHTML =
 
 `
 敵 : ${data.enemy}<br>
 HP : ${data.hp}
 `;
+
+}
+
+async function loadRecords(){
+
+    const response =
+        await fetch(
+            "/death_records"
+        );
+
+    const data =
+        await response.json();
+
+    let html = "";
+
+    for(
+        const row
+        of data
+    ){
+
+        html +=
+
+`
+${row.player_name}
+ Lv${row.level}
+ /
+ ${row.floor}階
+ /
+ ${row.enemy_name}
+ /
+ ${row.death_time}
+<br>
+`;
+
+    }
+
+    document
+    .getElementById(
+        "recordList"
+    )
+    .innerHTML =
+    html;
+
+}
+
+async function saveDeathRecord(){
+
+    const playerName =
+
+        document
+        .getElementById(
+            "playerName"
+        )
+        .value;
+
+    const response =
+
+        await fetch(
+            "/save_death_record",
+            {
+                method:"POST",
+
+                headers:{
+                    "Content-Type":
+                    "application/json"
+                },
+
+                body:JSON.stringify(
+                    {
+                        player_name:
+                        playerName
+                    }
+                )
+            }
+        );
+
+    const data =
+        await response.json();
+
+    if(
+        data.status ===
+        "already_saved"
+    ){
+
+        document
+        .getElementById(
+            "message"
+        )
+        .innerHTML =
+
+        "死亡記録は保存済み";
+
+        return;
+    }
+
+    document
+    .getElementById(
+        "message"
+    )
+    .innerHTML =
+
+    "死亡記録を保存しました";
+
+    document
+    .getElementById(
+        "saveDeathButton"
+    )
+    .disabled = true;
+
+    document
+    .getElementById(
+        "playerName"
+    )
+    .disabled = true;
+
+    loadRecords();
 
 }
 
@@ -175,9 +317,11 @@ async function startBattle(){
         "battle_start"
     ){
 
-        document.getElementById(
+        document
+        .getElementById(
             "message"
-        ).innerHTML =
+        )
+        .innerHTML =
 
         data.enemy +
         " が現れた！";
@@ -189,18 +333,24 @@ async function startBattle(){
         "already"
     ){
 
-        document.getElementById(
+        document
+        .getElementById(
             "message"
-        ).innerHTML =
+        )
+        .innerHTML =
+
         "すでに戦闘中";
 
     }
 
     else{
 
-        document.getElementById(
+        document
+        .getElementById(
             "message"
-        ).innerHTML =
+        )
+        .innerHTML =
+
         "ゲームオーバー";
 
     }
@@ -212,7 +362,9 @@ async function startBattle(){
 async function attackEnemy(){
 
     const response =
-        await fetch("/attack");
+        await fetch(
+            "/attack"
+        );
 
     const data =
         await response.json();
@@ -222,9 +374,12 @@ async function attackEnemy(){
         "no_enemy"
     ){
 
-        document.getElementById(
+        document
+        .getElementById(
             "message"
-        ).innerHTML =
+        )
+        .innerHTML =
+
         "敵がいない";
 
     }
@@ -238,9 +393,11 @@ async function attackEnemy(){
             data.level_up
         ){
 
-            document.getElementById(
+            document
+            .getElementById(
                 "message"
-            ).innerHTML =
+            )
+            .innerHTML =
 
             data.enemy +
             " を倒した！<br>レベルアップ！";
@@ -249,9 +406,11 @@ async function attackEnemy(){
 
         else{
 
-            document.getElementById(
+            document
+            .getElementById(
                 "message"
-            ).innerHTML =
+            )
+            .innerHTML =
 
             data.enemy +
             " を倒した！";
@@ -260,14 +419,17 @@ async function attackEnemy(){
 
     }
 
+    
     else if(
         data.status ===
         "continue"
     ){
 
-        document.getElementById(
+        document
+        .getElementById(
             "message"
-        ).innerHTML =
+        )
+        .innerHTML =
 
         "戦闘続行<br>" +
         "敵HP : " +
@@ -280,10 +442,13 @@ async function attackEnemy(){
 
     else{
 
-        document.getElementById(
+        document
+        .getElementById(
             "message"
-        ).innerHTML =
-        "ゲームオーバー";
+        )
+        .innerHTML =
+
+        "死亡しました";
 
     }
 
@@ -295,7 +460,9 @@ async function attackEnemy(){
 async function defend(){
 
     const response =
-        await fetch("/defend");
+        await fetch(
+            "/defend"
+        );
 
     const data =
         await response.json();
@@ -305,9 +472,11 @@ async function defend(){
         "no_enemy"
     ){
 
-        document.getElementById(
+        document
+        .getElementById(
             "message"
-        ).innerHTML =
+        )
+        .innerHTML =
         "敵がいない";
 
     }
@@ -317,19 +486,23 @@ async function defend(){
         "defended"
     ){
 
-        document.getElementById(
+        document
+        .getElementById(
             "message"
-        ).innerHTML =
+        )
+        .innerHTML =
         "防御した";
 
     }
 
     else{
 
-        document.getElementById(
+        document
+        .getElementById(
             "message"
-        ).innerHTML =
-        "ゲームオーバー";
+        )
+        .innerHTML =
+        "死亡しました";
 
     }
 
@@ -340,7 +513,9 @@ async function defend(){
 async function heal(){
 
     const response =
-        await fetch("/heal");
+        await fetch(
+            "/heal"
+        );
 
     const data =
         await response.json();
@@ -350,9 +525,11 @@ async function heal(){
         "no_enemy"
     ){
 
-        document.getElementById(
+        document
+        .getElementById(
             "message"
-        ).innerHTML =
+        )
+        .innerHTML =
         "戦闘中のみ回復可能";
 
     }
@@ -362,9 +539,11 @@ async function heal(){
         "heal_limit"
     ){
 
-        document.getElementById(
+        document
+        .getElementById(
             "message"
-        ).innerHTML =
+        )
+        .innerHTML =
         "回復は2回まで";
 
     }
@@ -374,19 +553,23 @@ async function heal(){
         "healed"
     ){
 
-        document.getElementById(
+        document
+        .getElementById(
             "message"
-        ).innerHTML =
+        )
+        .innerHTML =
         "HP回復";
 
     }
 
     else{
 
-        document.getElementById(
+        document
+        .getElementById(
             "message"
-        ).innerHTML =
-        "ゲームオーバー";
+        )
+        .innerHTML =
+        "死亡しました";
 
     }
 
@@ -397,7 +580,9 @@ async function heal(){
 async function runAway(){
 
     const response =
-        await fetch("/run");
+        await fetch(
+            "/run"
+        );
 
     const data =
         await response.json();
@@ -407,9 +592,11 @@ async function runAway(){
         "no_enemy"
     ){
 
-        document.getElementById(
+        document
+        .getElementById(
             "message"
-        ).innerHTML =
+        )
+        .innerHTML =
         "敵がいない";
 
     }
@@ -419,9 +606,11 @@ async function runAway(){
         "escaped"
     ){
 
-        document.getElementById(
+        document
+        .getElementById(
             "message"
-        ).innerHTML =
+        )
+        .innerHTML =
         "逃走成功";
 
     }
@@ -431,19 +620,23 @@ async function runAway(){
         "failed_escape"
     ){
 
-        document.getElementById(
+        document
+        .getElementById(
             "message"
-        ).innerHTML =
+        )
+        .innerHTML =
         "逃走失敗";
 
     }
 
     else{
 
-        document.getElementById(
+        document
+        .getElementById(
             "message"
-        ).innerHTML =
-        "ゲームオーバー";
+        )
+        .innerHTML =
+        "死亡しました";
 
     }
 
@@ -467,9 +660,11 @@ async function nextFloor(){
         "battle_first"
     ){
 
-        document.getElementById(
+        document
+        .getElementById(
             "message"
-        ).innerHTML =
+        )
+        .innerHTML =
         "敵を倒してから進む";
 
     }
@@ -479,10 +674,11 @@ async function nextFloor(){
         "ok"
     ){
 
-        document.getElementById(
+        document
+        .getElementById(
             "message"
-        ).innerHTML =
-
+        )
+        .innerHTML =
         data.floor +
         "階へ進んだ";
 
@@ -490,9 +686,11 @@ async function nextFloor(){
 
     else{
 
-        document.getElementById(
+        document
+        .getElementById(
             "message"
-        ).innerHTML =
+        )
+        .innerHTML =
         "ゲームオーバー";
 
     }
@@ -501,24 +699,95 @@ async function nextFloor(){
 
 }
 
-async function saveGame(){
+function saveGame(){
 
-    await fetch("/save");
+    const saveData = {
 
-    document.getElementById(
+        level:
+        window.currentPlayer.level,
+
+        exp:
+        window.currentPlayer.exp,
+
+        hp:
+        window.currentPlayer.hp,
+
+        max_hp:
+        window.currentPlayer.max_hp,
+
+        attack:
+        window.currentPlayer.attack,
+
+        defense:
+        window.currentPlayer.defense,
+
+        floor:
+        window.currentPlayer.floor
+
+    };
+
+    localStorage.setItem(
+        "roguelike_save",
+        JSON.stringify(
+            saveData
+        )
+    );
+
+    document
+    .getElementById(
         "message"
-    ).innerHTML =
+    )
+    .innerHTML =
     "セーブ完了";
 
 }
 
 async function loadGame(){
 
-    await fetch("/load");
+    const raw =
+        localStorage.getItem(
+            "roguelike_save"
+        );
 
-    document.getElementById(
+    if(
+        raw === null
+    ){
+
+        document
+        .getElementById(
+            "message"
+        )
+        .innerHTML =
+        "セーブなし";
+
+        return;
+
+    }
+
+    const data =
+        JSON.parse(raw);
+
+    await fetch(
+        "/import_save",
+        {
+            method:"POST",
+
+            headers:{
+                "Content-Type":
+                "application/json"
+            },
+
+            body:JSON.stringify(
+                data
+            )
+        }
+    );
+
+    document
+    .getElementById(
         "message"
-    ).innerHTML =
+    )
+    .innerHTML =
     "ロード完了";
 
     loadPlayer();
@@ -528,21 +797,107 @@ async function loadGame(){
 
 async function resetGame(){
 
-    await fetch("/reset");
+    await fetch(
+        "/reset"
+    );
 
-    document.getElementById(
+    localStorage.removeItem(
+        "roguelike_save"
+    );
+
+    document
+    .getElementById(
+        "deathArea"
+    )
+    .style.display =
+    "none";
+
+    document
+    .getElementById(
+        "playerName"
+    )
+    .value = "";
+
+    document
+    .getElementById(
+        "playerName"
+    )
+    .disabled = false;
+
+    document
+    .getElementById(
+        "saveDeathButton"
+    )
+    .disabled = false;
+
+    document
+    .getElementById(
         "message"
-    ).innerHTML =
+    )
+    .innerHTML =
     "最初から開始";
 
     loadPlayer();
-
     loadEnemy();
+
+}
+
+async function loadPlayer(){
+
+    const response =
+        await fetch(
+            "/player"
+        );
+
+    const data =
+        await response.json();
+
+    window.currentPlayer =
+        data;
+
+    document
+    .getElementById(
+        "status"
+    )
+    .innerHTML =
+
+`
+Lv : ${data.level}<br>
+HP : ${data.hp}/${data.max_hp}<br>
+攻撃 : ${data.attack}<br>
+防御 : ${data.defense}<br>
+EXP : ${data.exp}<br>
+Floor : ${data.floor}
+`;
+
+    if(
+        data.dead
+    ){
+
+        document
+        .getElementById(
+            "deathArea"
+        )
+        .style.display =
+        "block";
+
+    }
+    else{
+
+        document
+        .getElementById(
+            "deathArea"
+        )
+        .style.display =
+        "none";
+
+    }
 
 }
 
 loadPlayer();
 loadEnemy();
+loadRecords();
 
 </script>
 
