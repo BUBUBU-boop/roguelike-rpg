@@ -1,6 +1,13 @@
-from flask import Flask, jsonify, send_file
+from flask import (
+    Flask,
+    jsonify,
+    request,
+    send_file
+)
+
 import sqlite3
 import random
+from datetime import datetime
 
 app = Flask(__name__)
 
@@ -16,14 +23,20 @@ conn = sqlite3.connect(
 cursor = conn.cursor()
 
 cursor.execute("""
-CREATE TABLE IF NOT EXISTS player_save(
-    id INTEGER PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS death_records(
+
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+    player_name TEXT,
+
     level INTEGER,
-    exp INTEGER,
-    hp INTEGER,
-    max_hp INTEGER,
-    attack INTEGER,
-    floor INTEGER
+
+    floor INTEGER,
+
+    enemy_name TEXT,
+
+    death_time TEXT
+
 )
 """)
 
@@ -38,15 +51,12 @@ class Player:
     def __init__(self):
 
         self.level = 1
-
         self.exp = 0
 
         self.max_hp = 30
-
         self.hp = 30
 
         self.attack = 5
-
         self.defense = 2
 
         self.dead = False
@@ -69,11 +79,8 @@ class Enemy:
     ):
 
         self.name = name
-
         self.hp = hp
-
         self.attack = attack
-
         self.exp = exp
 
 
@@ -93,6 +100,10 @@ player = Player()
 dungeon = Dungeon()
 
 current_enemy = None
+
+last_dead_enemy = ""
+
+death_record_saved = False
 
 
 # =====================
@@ -123,10 +134,6 @@ def create_enemy():
         enemy_pool
     )
 
-    # -----------------
-    # スライム
-    # -----------------
-
     if enemy_type == "slime":
 
         return Enemy(
@@ -136,10 +143,6 @@ def create_enemy():
             5 + level
         )
 
-    # -----------------
-    # ゴブリン
-    # -----------------
-
     elif enemy_type == "goblin":
 
         return Enemy(
@@ -148,10 +151,6 @@ def create_enemy():
             4 + level,
             10 + level
         )
-
-    # -----------------
-    # オーク
-    # -----------------
 
     return Enemy(
         "オーク",
@@ -174,7 +173,7 @@ def index():
 
 
 # =====================
-# PLAYER API
+# PLAYER
 # =====================
 
 @app.route("/player")
@@ -183,17 +182,19 @@ def get_player():
     return jsonify(
         {
             "level": player.level,
+            "exp": player.exp,
             "hp": player.hp,
             "max_hp": player.max_hp,
             "attack": player.attack,
-            "exp": player.exp,
-            "floor": dungeon.floor
+            "defense": player.defense,
+            "floor": dungeon.floor,
+            "dead": player.dead
         }
     )
 
 
 # =====================
-# ENEMY API
+# ENEMY
 # =====================
 
 @app.route("/enemy")
@@ -230,7 +231,7 @@ def start_battle():
 
         return jsonify(
             {
-                "status": "game_over"
+                "status":"game_over"
             }
         )
 
@@ -238,13 +239,9 @@ def start_battle():
 
         return jsonify(
             {
-                "status": "already"
+                "status":"already"
             }
         )
-
-    # -----------------
-    # ラスボス
-    # -----------------
 
     if dungeon.floor == 30:
 
@@ -263,10 +260,11 @@ def start_battle():
 
     return jsonify(
         {
-            "status": "battle_start",
-            "enemy": current_enemy.name
+            "status":"battle_start",
+            "enemy":current_enemy.name
         }
     )
+
 
 # =====================
 # ATTACK
@@ -276,6 +274,8 @@ def start_battle():
 def attack():
 
     global current_enemy
+    global last_dead_enemy
+    global death_record_saved
 
     if player.dead:
 
@@ -294,10 +294,6 @@ def attack():
         )
 
     current_enemy.hp -= player.attack
-
-    # -----------------
-    # 撃破
-    # -----------------
 
     if current_enemy.hp <= 0:
 
@@ -335,10 +331,6 @@ def attack():
             }
         )
 
-    # -----------------
-    # 敵反撃
-    # -----------------
-
     damage = max(
         1,
         current_enemy.attack
@@ -352,6 +344,10 @@ def attack():
         player.hp = 0
 
         player.dead = True
+
+        death_record_saved = False
+
+        last_dead_enemy = current_enemy.name
 
         return jsonify(
             {
@@ -367,7 +363,6 @@ def attack():
         }
     )
 
-
 # =====================
 # DEFEND
 # =====================
@@ -376,6 +371,8 @@ def attack():
 def defend():
 
     global current_enemy
+    global last_dead_enemy
+    global death_record_saved
 
     if current_enemy is None:
 
@@ -387,9 +384,7 @@ def defend():
 
     damage = max(
         1,
-        (
-            current_enemy.attack // 2
-        )
+        (current_enemy.attack // 2)
         - player.defense
     )
 
@@ -400,6 +395,10 @@ def defend():
         player.hp = 0
 
         player.dead = True
+
+        death_record_saved = False
+
+        last_dead_enemy = current_enemy.name
 
         return jsonify(
             {
@@ -422,6 +421,8 @@ def defend():
 def heal():
 
     global current_enemy
+    global last_dead_enemy
+    global death_record_saved
 
     if current_enemy is None:
 
@@ -461,6 +462,10 @@ def heal():
 
         player.dead = True
 
+        death_record_saved = False
+
+        last_dead_enemy = current_enemy.name
+
         return jsonify(
             {
                 "status":"game_over"
@@ -475,13 +480,15 @@ def heal():
 
 
 # =====================
-# ESCAPE
+# RUN
 # =====================
 
 @app.route("/run")
 def run_away():
 
     global current_enemy
+    global last_dead_enemy
+    global death_record_saved
 
     if current_enemy is None:
 
@@ -519,6 +526,10 @@ def run_away():
         player.hp = 0
 
         player.dead = True
+
+        death_record_saved = False
+
+        last_dead_enemy = current_enemy.name
 
         return jsonify(
             {
@@ -571,30 +582,46 @@ def next_floor():
 
 
 # =====================
-# SAVE
+# SAVE DEATH RECORD
 # =====================
 
-@app.route("/save")
-def save_game():
+@app.route(
+    "/save_death_record",
+    methods=["POST"]
+)
+def save_death_record():
 
-    cursor.execute(
-        "DELETE FROM player_save"
-    )
+    global death_record_saved
+
+    if death_record_saved:
+
+        return jsonify(
+            {
+                "status":"already_saved"
+            }
+        )
+
+    data = request.json
+
+    player_name = data.get(
+        "player_name",
+        ""
+    ).strip()
+
+    if player_name == "":
+
+        player_name = "名無し"
 
     cursor.execute(
         """
-        INSERT INTO player_save(
-            id,
+        INSERT INTO death_records(
+            player_name,
             level,
-            exp,
-            hp,
-            max_hp,
-            attack,
-            floor
+            floor,
+            enemy_name,
+            death_time
         )
         VALUES(
-            1,
-            ?,
             ?,
             ?,
             ?,
@@ -603,16 +630,19 @@ def save_game():
         )
         """,
         (
+            player_name,
             player.level,
-            player.exp,
-            player.hp,
-            player.max_hp,
-            player.attack,
-            dungeon.floor
+            dungeon.floor,
+            last_dead_enemy,
+            datetime.now().strftime(
+                "%Y-%m-%d %H:%M:%S"
+            )
         )
     )
 
     conn.commit()
+
+    death_record_saved = True
 
     return jsonify(
         {
@@ -622,47 +652,64 @@ def save_game():
 
 
 # =====================
-# LOAD
+# DEATH RECORDS
 # =====================
 
-@app.route("/load")
-def load_game():
+@app.route("/death_records")
+def death_records():
 
-    global current_enemy
-
-    row = cursor.execute(
+    rows = cursor.execute(
         """
         SELECT
+            player_name,
             level,
-            exp,
-            hp,
-            max_hp,
-            attack,
-            floor
-        FROM player_save
-        WHERE id = 1
+            floor,
+            enemy_name,
+            death_time
+        FROM death_records
+        ORDER BY floor DESC
         """
-    ).fetchone()
+    ).fetchall()
 
-    if row is None:
+    result = []
 
-        return jsonify(
+    for row in rows:
+
+        result.append(
             {
-                "status":"not_found"
+                "player_name":row[0],
+                "level":row[1],
+                "floor":row[2],
+                "enemy_name":row[3],
+                "death_time":row[4]
             }
         )
 
-    player.level = row[0]
-    player.exp = row[1]
-    player.hp = row[2]
-    player.max_hp = row[3]
-    player.attack = row[4]
+    return jsonify(result)
 
-    dungeon.floor = row[5]
+
+# =====================
+# IMPORT SAVE
+# =====================
+
+@app.route(
+    "/import_save",
+    methods=["POST"]
+)
+def import_save():
+
+    data = request.json
+
+    player.level = data["level"]
+    player.exp = data["exp"]
+    player.hp = data["hp"]
+    player.max_hp = data["max_hp"]
+    player.attack = data["attack"]
+    player.defense = data["defense"]
+
+    dungeon.floor = data["floor"]
 
     player.dead = False
-
-    current_enemy = None
 
     return jsonify(
         {
@@ -681,12 +728,15 @@ def reset():
     global player
     global dungeon
     global current_enemy
+    global death_record_saved
 
     player = Player()
 
     dungeon = Dungeon()
 
     current_enemy = None
+
+    death_record_saved = False
 
     return jsonify(
         {
@@ -696,7 +746,7 @@ def reset():
 
 
 # =====================
-# RUN
+# RUN APP
 # =====================
 
 if __name__ == "__main__":
