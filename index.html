@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta name="viewport"
+content="width=device-width, initial-scale=1.0">
+
+<title>ローグライクRPG</title>
+
+<style>
+
+body{
+    background:#111;
+    color:white;
+    font-family:monospace;
+    padding:20px;
+}
+
+button{
+    margin:5px;
+    padding:10px;
+    font-size:16px;
+}
+
+#status{
+    border:1px solid #555;
+    padding:10px;
+    margin-bottom:10px;
+}
+
+#enemy{
+    border:1px solid #555;
+    padding:10px;
+    margin-bottom:10px;
+}
+
+#message{
+    border:1px solid #555;
+    padding:10px;
+    min-height:60px;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<h1>ローグライクRPG</h1>
+
+<div id="status">
+読み込み中...
+</div>
+
+<div id="enemy">
+敵なし
+</div>
+
+<div id="message">
+ゲーム開始
+</div>
+
+<br>
+
+<button onclick="startBattle()">
+敵を探す
+</button>
+
+<button onclick="attackEnemy()">
+攻撃
+</button>
+
+<button onclick="defend()">
+防御
+</button>
+
+<button onclick="heal()">
+回復
+</button>
+
+<button onclick="runAway()">
+逃走
+</button>
+
+<br><br>
+
+<button onclick="nextFloor()">
+次の階へ
+</button>
+
+<button onclick="saveGame()">
+セーブ
+</button>
+
+<button onclick="loadGame()">
+ロード
+</button>
+
+<script>
+
+async function loadPlayer(){
+
+    const response =
+        await fetch("/player");
+
+    const data =
+        await response.json();
+
+    document.getElementById(
+        "status"
+    ).innerHTML =
+
+`
+Lv : ${data.level}<br>
+HP : ${data.hp}/${data.max_hp}<br>
+攻撃 : ${data.attack}<br>
+EXP : ${data.exp}<br>
+Floor : ${data.floor}
+`;
+
+}
+
+async function loadEnemy(){
+
+    const response =
+        await fetch("/enemy");
+
+    const data =
+        await response.json();
+
+    if(
+        data.enemy === null
+    ){
+
+        document.getElementById(
+            "enemy"
+        ).innerHTML =
+        "敵なし";
+
+        return;
+
+    }
+
+    document.getElementById(
+        "enemy"
+    ).innerHTML =
+
+`
+敵 : ${data.enemy}<br>
+HP : ${data.hp}
+`;
+
+}
+
+async function startBattle(){
+
+    const response =
+        await fetch(
+            "/start_battle"
+        );
+
+    const data =
+        await response.json();
+
+    if(
+        data.status ===
+        "battle_start"
+    ){
+
+        document.getElementById(
+            "message"
+        ).innerHTML =
+
+        data.enemy +
+        " が現れた！";
+
+    }
+
+    else if(
+        data.status ===
+        "already"
+    ){
+
+        document.getElementById(
+            "message"
+        ).innerHTML =
+        "すでに戦闘中";
+
+    }
+
+    else{
+
+        document.getElementById(
+            "message"
+        ).innerHTML =
+        "ゲームオーバー";
+
+    }
+
+    loadEnemy();
+
+}
+
+async function attackEnemy(){
+
+    const response =
+        await fetch("/attack");
+
+    const data =
+        await response.json();
+
+    if(
+        data.status ===
+        "no_enemy"
+    ){
+
+        document.getElementById(
+            "message"
+        ).innerHTML =
+        "敵がいない";
+
+    }
+
+    else if(
+        data.status ===
+        "victory"
+    ){
+
+        if(
+            data.level_up
+        ){
+
+            document.getElementById(
+                "message"
+            ).innerHTML =
+
+            data.enemy +
+            " を倒した！<br>レベルアップ！";
+
+        }
+
+        else{
+
+            document.getElementById(
+                "message"
+            ).innerHTML =
+
+            data.enemy +
+            " を倒した！";
+
+        }
+
+    }
+
+    else if(
+        data.status ===
+        "continue"
+    ){
+
+        document.getElementById(
+            "message"
+        ).innerHTML =
+
+        "戦闘続行<br>" +
+        "敵HP : " +
+        data.enemy_hp +
+        "<br>" +
+        "自分HP : " +
+        data.player_hp;
+
+    }
+
+    else{
+
+        document.getElementById(
+            "message"
+        ).innerHTML =
+        "ゲームオーバー";
+
+    }
+
+    loadPlayer();
+    loadEnemy();
+
+}
+
+async function defend(){
+
+    const response =
+        await fetch("/defend");
+
+    const data =
+        await response.json();
+
+    if(
+        data.status ===
+        "no_enemy"
+    ){
+
+        document.getElementById(
+            "message"
+        ).innerHTML =
+        "敵がいない";
+
+    }
+
+    else if(
+        data.status ===
+        "defended"
+    ){
+
+        document.getElementById(
+            "message"
+        ).innerHTML =
+        "防御した";
+
+    }
+
+    else{
+
+        document.getElementById(
+            "message"
+        ).innerHTML =
+        "ゲームオーバー";
+
+    }
+
+    loadPlayer();
+
+}
+
+async function heal(){
+
+    const response =
+        await fetch("/heal");
+
+    const data =
+        await response.json();
+
+    if(
+        data.status ===
+        "no_enemy"
+    ){
+
+        document.getElementById(
+            "message"
+        ).innerHTML =
+        "戦闘中のみ回復可能";
+
+    }
+
+    else if(
+        data.status ===
+        "heal_limit"
+    ){
+
+        document.getElementById(
+            "message"
+        ).innerHTML =
+        "回復は2回まで";
+
+    }
+
+    else if(
+        data.status ===
+        "healed"
+    ){
+
+        document.getElementById(
+            "message"
+        ).innerHTML =
+        "HP回復";
+
+    }
+
+    else{
+
+        document.getElementById(
+            "message"
+        ).innerHTML =
+        "ゲームオーバー";
+
+    }
+
+    loadPlayer();
+
+}
+
+async function runAway(){
+
+    const response =
+        await fetch("/run");
+
+    const data =
+        await response.json();
+
+    if(
+        data.status ===
+        "no_enemy"
+    ){
+
+        document.getElementById(
+            "message"
+        ).innerHTML =
+        "敵がいない";
+
+    }
+
+    else if(
+        data.status ===
+        "escaped"
+    ){
+
+        document.getElementById(
+            "message"
+        ).innerHTML =
+        "逃走成功";
+
+    }
+
+    else if(
+        data.status ===
+        "failed_escape"
+    ){
+
+        document.getElementById(
+            "message"
+        ).innerHTML =
+        "逃走失敗";
+
+    }
+
+    else{
+
+        document.getElementById(
+            "message"
+        ).innerHTML =
+        "ゲームオーバー";
+
+    }
+
+    loadPlayer();
+    loadEnemy();
+
+}
+
+async function nextFloor(){
+
+    const response =
+        await fetch(
+            "/next_floor"
+        );
+
+    const data =
+        await response.json();
+
+    if(
+        data.status ===
+        "battle_first"
+    ){
+
+        document.getElementById(
+            "message"
+        ).innerHTML =
+        "敵を倒してから進む";
+
+    }
+
+    else if(
+        data.status ===
+        "ok"
+    ){
+
+        document.getElementById(
+            "message"
+        ).innerHTML =
+
+        data.floor +
+        "階へ進んだ";
+
+    }
+
+    else{
+
+        document.getElementById(
+            "message"
+        ).innerHTML =
+        "ゲームオーバー";
+
+    }
+
+    loadPlayer();
+
+}
+
+async function saveGame(){
+
+    await fetch("/save");
+
+    document.getElementById(
+        "message"
+    ).innerHTML =
+    "セーブ完了";
+
+}
+
+async function loadGame(){
+
+    await fetch("/load");
+
+    document.getElementById(
+        "message"
+    ).innerHTML =
+    "ロード完了";
+
+    loadPlayer();
+    loadEnemy();
+
+}
+
+loadPlayer();
+loadEnemy();
+
+</script>
+
+</body>
+</html>
